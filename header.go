@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/textproto"
@@ -204,7 +205,11 @@ func parseMediaType(ctype string) (mtype string, params map[string]string, err e
 			}
 			mtype, params, err = mime.ParseMediaType(mctype)
 			if err != nil {
-				return "", nil, err
+				// If the media parameter has special characters, ensure that it is quoted
+				mtype, params, err = mime.ParseMediaType(fixUnquotedSpecials(mctype))
+				if err != nil {
+					return "", nil, err
+				}
 			}
 		}
 	}
@@ -238,9 +243,27 @@ func fixMangledMediaType(mtype, sep string) string {
 				}
 			}
 		}
-		mtype += p + ";"
+		mtype += p
+		// only terminate with semicolon if not the last parameter and if it doesn't already have a semicolon
+		if i != len(parts)-1 && !strings.HasSuffix(mtype, ";") {
+			mtype += ";"
+		}
+	}
+	if strings.HasSuffix(mtype, ";") {
+		mtype = mtype[:len(mtype)-1]
 	}
 	return mtype
+}
+
+// fixUnquotedSpecials as defined in https://www.w3.org/Protocols/rfc1341/4_Content-Type.html
+func fixUnquotedSpecials(s string) string {
+	if strings.Contains(s, "name=") {
+		nameSplit := strings.SplitAfter(s, "name=")
+		if strings.ContainsAny(nameSplit[1], "()<>@,;:\\/[]?.=") && !strings.HasSuffix(nameSplit[1], "\"") {
+			return fmt.Sprintf("%s\"%s\"", nameSplit[0], nameSplit[1])
+		}
+	}
+	return s
 }
 
 // Detects a RFC-822 linear-white-space, passed to strings.FieldsFunc
