@@ -740,3 +740,32 @@ func TestClonePart(t *testing.T) {
 	clone := p.Clone(nil)
 	test.ComparePart(t, clone, p)
 }
+
+func TestBadAttach(t *testing.T) {
+	r := test.OpenTestData("parts", "badattach.raw")
+	p, err := enmime.ReadParts(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := ""
+	if p.ContentType != want {
+		t.Errorf("ContentType %q, want %q", p.ContentType, want)
+	}
+	want = ""
+	if p.FileName != want {
+		t.Errorf("FileName %q, want %q", p.FileName, want)
+	}
+	want = ""
+	if p.Charset != want {
+		t.Errorf("Charset %q, want %q", p.Charset, want)
+	}
+	want = "attachment"
+	if p.Disposition != want {
+		t.Errorf("Disposition %q, want %q", p.Disposition, want)
+	}
+	want = ""
+	if p.ContentID != want {
+		t.Errorf("ContentID %q, want %q", p.ContentID, want)
+	}
+}
