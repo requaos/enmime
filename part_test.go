@@ -768,4 +768,19 @@ func TestBadAttach(t *testing.T) {
 	if p.ContentID != want {
 		t.Errorf("ContentID %q, want %q", p.ContentID, want)
 	}
+	satisfied := false
+	for _, perr := range p.Errors {
+		if perr.Name == enmime.ErrorMissingContentType {
+			satisfied = true
+			if perr.Severe {
+				t.Errorf("Expected Severe to be false, got true for %q", perr.Name)
+			}
+		}
+	}
+	if !satisfied {
+		t.Errorf(
+			"Did not find expected error on part. Expected %q, but had: %v",
+			enmime.ErrorMissingContentType,
+			p.Errors)
+	}
 }
