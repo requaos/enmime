@@ -20,15 +20,15 @@ const peekBufferSize = 4096
 var errNoBoundaryTerminator = stderrors.New("expected boundary not present")
 
 type boundaryReader struct {
-	finished         bool          // No parts remain when finished
-	partsRead        int           // Number of parts read thus far
-	r                *bufio.Reader // Source reader
-	nlPrefix         []byte        // NL + MIME boundary prefix
-	prefix           []byte        // MIME boundary prefix
-	final            []byte        // Final boundary prefix
-	buffer           *bytes.Buffer // Content waiting to be read
-	crBoundaryPrefix bool          // Flag for CR in CRLF + MIME boundary
-	unbounded        bool          // Flag to throw errNoBoundaryTerminator
+	finished        bool          // No parts remain when finished
+	partsRead       int           // Number of parts read thus far
+	r               *bufio.Reader // Source reader
+	nlPrefix        []byte        // NL + MIME boundary prefix
+	prefix          []byte        // MIME boundary prefix
+	final           []byte        // Final boundary prefix
+	buffer          *bytes.Buffer // Content waiting to be read
+	crBoundryPrefix bool          // Flag for CR in CRLF + MIME boundary
+	unbounded       bool          // Flag to throw errNoBoundaryTerminator
 }
 
 // newBoundaryReader returns an initialized boundaryReader
@@ -67,16 +67,13 @@ func (b *boundaryReader) Read(dest []byte) (n int, err error) {
 				// check for a match against boundary or terminal boundary
 				if b.isDelimiter(peek[1:]) || b.isTerminator(peek[1:]) {
 					// if we stashed a carriage return, lets pop that back onto the io.Reader
-					if b.crBoundaryPrefix {
+					if b.crBoundryPrefix {
 						err = b.r.UnreadByte()
-						switch err {
-						case bufio.ErrInvalidUnreadByte:
-							// carriage return boundary prefix bit already unread
-						default:
+						if err != nil {
 							// this should never happen, fatal error
 							return 0, errors.WithStack(err)
 						}
-						b.crBoundaryPrefix = false
+						b.crBoundryPrefix = false
 					}
 					n, err = b.buffer.Read(dest)
 					switch err {
@@ -95,12 +92,12 @@ func (b *boundaryReader) Read(dest []byte) (n int, err error) {
 				continue
 			}
 			// wasn't a boundary, write the stored carriage return
-			if b.crBoundaryPrefix {
+			if b.crBoundryPrefix {
 				err = b.buffer.WriteByte(byte('\r'))
 				if err != nil {
 					return 0, errors.WithStack(err)
 				}
-				b.crBoundaryPrefix = false
+				b.crBoundryPrefix = false
 			}
 		}
 
@@ -110,7 +107,7 @@ func (b *boundaryReader) Read(dest []byte) (n int, err error) {
 			if err != nil {
 				return 0, errors.WithStack(err)
 			}
-			b.crBoundaryPrefix = true
+			b.crBoundryPrefix = true
 			continue
 		}
 
