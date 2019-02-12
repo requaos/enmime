@@ -543,9 +543,6 @@ func fixUnescapedQuotes(s string) string {
 			param = fmt.Sprintf("%s%s", param, split[i+1])
 			closingQuoteIdx = strings.LastIndexByte(param, '"')
 			i++
-			if closingQuoteIdx == openingQuoteIdx {
-				return fresh.String()
-			}
 		}
 		// it's got quotes, lets put the k/v separator back in along with everything upto the first quote
 		fresh.WriteByte('=')
