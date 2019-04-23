@@ -290,6 +290,11 @@ func fixMangledMediaType(mtype, sep string) string {
 				}
 			}
 		default:
+			if strings.HasSuffix(p, "=") && strings.Count(p, "=") == 1 {
+				// Ignore attribute key without a value, ie: "charset="
+				continue
+			}
+
 			if !strings.Contains(p, "=") {
 				p = p + "=" + pvPlaceholder
 			}
@@ -304,7 +309,7 @@ func fixMangledMediaType(mtype, sep string) string {
 			}
 
 			if strings.ContainsAny(pair[0], "()<>@,;:\"\\/[]?") {
-				// attribute is a strict token and cannot be a quoted-string
+				// Attribute is a strict token and cannot be a quoted-string
 				// if any of the above characters are present in a token it
 				// must be quoted and is therefor an invalid attribute.
 				// Discard the pair.
