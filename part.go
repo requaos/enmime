@@ -258,8 +258,14 @@ func (p *Part) convertFromStatedCharset(r io.Reader) io.Reader {
 // placing the result into Part.Content.  IO errors will be returned immediately; other errors
 // and warnings will be added to Part.Errors.
 func (p *Part) decodeContent(r io.Reader) error {
+	// Get an io.ReadSeeker to try decoding as plain text if base64 decoding fails.
+	rawContent, err := ioutil.ReadAll(r)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	// contentReader will point to the end of the content decoding pipeline.
-	contentReader := r
+	var contentReader io.Reader
+	rawContentReader := bytes.NewReader(rawContent)
 	// b64cleaner aggregates errors, must maintain a reference to it to get them later.
 	var b64cleaner *coding.Base64Cleaner
 	// Build content decoding reader.
@@ -267,13 +273,14 @@ func (p *Part) decodeContent(r io.Reader) error {
 	validEncoding := true
 	switch strings.ToLower(encoding) {
 	case cteQuotedPrintable:
-		contentReader = coding.NewQPCleaner(contentReader)
+		contentReader = coding.NewQPCleaner(rawContentReader)
 		contentReader = quotedprintable.NewReader(contentReader)
 	case cteBase64:
-		b64cleaner = coding.NewBase64Cleaner(contentReader)
+		b64cleaner = coding.NewBase64Cleaner(rawContentReader)
 		contentReader = base64.NewDecoder(base64.RawStdEncoding, b64cleaner)
 	case cte8Bit, cte7Bit, cteBinary, "":
 		// No decoding required.
+		contentReader = rawContentReader
 	default:
 		// Unknown encoding.
 		validEncoding = false
@@ -281,6 +288,7 @@ func (p *Part) decodeContent(r io.Reader) error {
 			ErrorContentEncoding,
 			"Unrecognized Content-Transfer-Encoding type %q",
 			encoding)
+		contentReader = rawContentReader
 	}
 	// Build charset decoding reader.
 	if validEncoding && strings.HasPrefix(p.ContentType, "text/") {
@@ -298,8 +306,17 @@ func (p *Part) decodeContent(r io.Reader) error {
 	p.Content = content
 	// Collect base64 errors.
 	if b64cleaner != nil {
+		// indication of plain-text content rfc822 document is "Unexpected ':' in Base64 stream"
+		unexpectedColon := false
 		for _, err := range b64cleaner.Errors {
 			p.addWarning(ErrorMalformedBase64, err.Error())
+			if err.Error() == "Unexpected ':' in Base64 stream" {
+				unexpectedColon = true
+			}
+		}
+		if unexpectedColon {
+			// Set content to the raw decoded value
+			p.Content = rawContent
 		}
 	}
 	// Set empty content-type error.
